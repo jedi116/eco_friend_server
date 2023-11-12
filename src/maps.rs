@@ -50,6 +50,7 @@ pub async fn get_direction_with_matrix (direction_request: DirectionRequest, goo
 }
 
 pub async fn get_places (google_maps_client: GoogleMapsClient, place: String) -> Option<AutocompleteResponse> {
+    println!("{}",&place);
     let places_response = google_maps_client.place_autocomplete(place).execute().await;
     match places_response {
         Err(message) => {
