@@ -1,6 +1,7 @@
 mod db;
 mod routes;
 mod maps;
+mod calculator;
 
 use db::Database;
 use dotenv::dotenv;
@@ -10,8 +11,9 @@ use google_maps::prelude::GoogleMapsClient;
 use std::env;
 use actix_cors::Cors;
 
+#[derive(Debug)]
 pub struct AppState {
-    pub db: Database,
+    pub db: Option<Database>,
     pub google_map_client: GoogleMapsClient
 }
 
@@ -19,14 +21,7 @@ pub struct AppState {
 async fn main()  -> std::io::Result<()> {
     // Load environment variables from .env file if present
     dotenv().ok();
-    let mut database = match Database::new() {
-        Some(database) => {
-            database
-        }
-        None => {
-            Database { pool: None }
-        }
-    };
+    let mut database = Database::new();
     let api_key = env::var("GOOGLE_API_KEY").ok();
     let google_api_key = match api_key {
         Some(key) => key,
@@ -56,6 +51,10 @@ async fn main()  -> std::io::Result<()> {
         .service(get_direction_metrix)
         .service(get_place_predications)
         .service(get_place_details)
+        .service(get_driving_direction_with_place_name)
+        .service(get_transit_direction_with_place_name)
+        .service(get_passenger_cars)
+        .service(get_driving_carbon_foot_print_with_place_name)
         .default_service(web::route().to(not_found))
         .wrap(actix_web::middleware::Logger::default())
     })

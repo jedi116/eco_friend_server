@@ -1,7 +1,9 @@
 use actix_web::{get, HttpResponse, Responder, Result, post, web::{Json, Data}};
+use google_maps::directions;
 use serde::{Serialize, Deserialize};
 use crate::maps::*;
 use crate::AppState;
+use crate::calculator::*;
 
 #[derive(Serialize)]
 pub struct Response {
@@ -21,9 +23,16 @@ pub struct PlacesRequest {
     pub place: String
 }
 
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PlaceDetailsRequest {
     pub place_id: String
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AddressDirectionRequest {
+    pub origin_address: String,
+    pub destination_address: String
 }
 
 #[get("/health")]
@@ -47,6 +56,48 @@ pub async fn get_driving_directions(app: Data<AppState>, request: Json<Direction
             })
         }
     }
+}
+
+#[post("/getDrivingDirectionsWithPlaceName")]
+pub async fn get_driving_direction_with_place_name(app: Data<AppState>, request: Json<AddressDirectionRequest>) -> impl Responder {
+    let response = get_driving_directions_by_address(
+        app.google_map_client.clone(), 
+        AddressDirectionRequest { 
+            origin_address: request.origin_address.clone(), 
+            destination_address: request.destination_address.clone() 
+        }
+        ).await;
+        match response {
+            Some(direction) => {
+                HttpResponse::Ok().json(direction.routes)
+            }
+            None => {
+                HttpResponse::InternalServerError().json(Response {
+                    message: "Run into issues".to_string()
+                })
+            }
+        }
+}
+
+#[post("/getTransitDirectionsWithPlaceName")]
+pub async fn get_transit_direction_with_place_name(app: Data<AppState>, request: Json<AddressDirectionRequest>) -> impl Responder {
+    let response = get_transit_directions_by_address(
+        app.google_map_client.clone(), 
+        AddressDirectionRequest { 
+            origin_address: request.origin_address.clone(), 
+            destination_address: request.destination_address.clone() 
+        }
+        ).await;
+        match response {
+            Some(direction) => {
+                HttpResponse::Ok().json(direction.routes)
+            }
+            None => {
+                HttpResponse::InternalServerError().json(Response {
+                    message: "Run into issues".to_string()
+                })
+            }
+        }
 }
 
 #[post("/getDirectionMatrix")]
@@ -92,6 +143,59 @@ pub async fn get_place_details (request: Json<PlaceDetailsRequest>, app: Data<Ap
             })
         }
     }
+}
+
+#[get("/getPassengerCarEfFactors")]
+pub async fn get_passenger_cars (app: Data<AppState>) -> impl Responder {
+    let result = app.db.as_ref().and_then(|data| {
+        data.get_passenger_cars()
+    });
+    
+    match result {
+        Some(places) => {
+            HttpResponse::Ok().json(places)
+        }
+        None => {
+            HttpResponse::InternalServerError().json(Response {
+                message: "Run into issues".to_string()
+            })
+        }
+    }
+}
+
+
+#[post("/getDrivingDirectionsCarbonFootPrint")]
+pub async fn get_driving_carbon_foot_print_with_place_name(app: Data<AppState>, request: Json<AddressDirectionRequest>) -> impl Responder {
+    let direction_response = get_driving_directions_by_address(
+        app.google_map_client.clone(), 
+        AddressDirectionRequest { 
+            origin_address: request.origin_address.clone(), 
+            destination_address: request.destination_address.clone() 
+        }
+        ).await;
+    let passenger_car_results = app.db.as_ref().and_then(|data| {
+        data.get_passenger_cars()
+    });    
+        match direction_response {
+            Some(direction) => {
+                match passenger_car_results {
+                    Some(cars) => {
+                        let result = calculate_carbon_footprint_for_car_rides(cars, direction).await;
+                        HttpResponse::Ok().json(result)
+                    }
+                    None => {
+                        HttpResponse::InternalServerError().json(Response {
+                            message: "Run into issues".to_string()
+                        })
+                    }
+                }
+            }
+            None => {
+                HttpResponse::InternalServerError().json(Response {
+                    message: "Run into issues".to_string()
+                })
+            }
+        }
 }
 
 pub async fn not_found() -> Result<HttpResponse> {

@@ -1,8 +1,21 @@
-use mysql::{prelude::*, PooledConn};
+use mysql::{prelude::*, PooledConn, Pool};
 use std::env;
+use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Tranport {
+    pub id: i64,
+    pub name: String,
+    pub t_type: String,
+    pub fuel: String,
+    pub unit: String,
+    pub region: String,
+    pub ef_factor: f64,
+}
+
+#[derive(Debug)]
 pub struct Database {
-    pub pool: Option<PooledConn>,
+    pub pool: Pool,
 }
 
 impl Database {
@@ -13,18 +26,8 @@ impl Database {
         let pool = mysql::Pool::new(builder.ssl_opts(mysql::SslOpts::default()));
         match pool {
             Ok(_pool) => {
-                let mut _conn = _pool.get_conn();
-                match _conn {
-                    Ok(connection) => {
-                        println!("Successfully connected to PlanetScale!");
-                        Some(Database { pool: Some(connection) })
-                    }
-                    Err(error) => {
-                        print!("{:?}",error);
-                        None  
-                    }
-                }
-                
+                //let mut _conn = _pool.get_conn();
+                Some(Database { pool: _pool })
             }
             Err(error) => {
                 print!("{:?}",error);
@@ -32,6 +35,44 @@ impl Database {
             }
         }
         
+    }
+
+    pub fn get_passenger_cars (&self) -> Option<Vec<Tranport>> {
+        let pool = &self.pool;
+        let poolCon = &mut pool.get_conn();
+        match poolCon  {
+            Ok(connection) => {
+                let query_result = connection.query_map(
+                    "SELECT id, tName, tType, fuel, unit, region, efFactor from `eco-friend`.Transport  where tType = 'Passenger Cars'",
+                    |(id, tName, tType, fuel, unit, region, efFactor)| {
+                        Tranport {
+                            id,
+                            name: tName,
+                            t_type: tType,
+                            fuel,
+                            unit,
+                            region,
+                            ef_factor: efFactor
+                        }
+                    }
+                );
+                match query_result {
+                    Ok(dataset) => {
+                        Some(dataset)
+                    }
+                    Err(error) => {
+                        print!("{:?}",error);
+                        None
+                    }
+                    
+                }
+            }
+
+            Err(error) => {
+                println!("{:?}",error);
+                None
+            }
+        }
     }
 }
 

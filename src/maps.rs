@@ -75,3 +75,41 @@ pub async fn get_place_details_gmaps (google_maps_client: GoogleMapsClient, plac
         } 
     }
 }
+
+pub async fn get_driving_directions_by_address (google_maps_client: GoogleMapsClient, address: AddressDirectionRequest) -> Option<DirectionsResponse> {
+    let direction = google_maps_client.directions(
+        Location::Address(address.origin_address), 
+        Location::Address(address.destination_address)
+    ).with_travel_mode(TravelMode::Driving)
+    .execute()
+    .await;
+    match direction {
+        Err(message) => {
+            print!("{}",message);
+            None
+        }
+        Ok(res) => {
+            println!("Distance between origin and destination {:?}",res.routes[0].legs[0].distance);
+            Some(res)
+        } 
+    }
+}
+
+pub async fn get_transit_directions_by_address (google_maps_client: GoogleMapsClient, address: AddressDirectionRequest) -> Option<DirectionsResponse> {
+    let direction = google_maps_client.directions(
+        Location::Address(address.origin_address), 
+        Location::Address(address.destination_address)
+    ).with_travel_mode(TravelMode::Transit)
+    .execute()
+    .await;
+    match direction {
+        Err(message) => {
+            print!("{}",message);
+            None
+        }
+        Ok(res) => {
+            println!("Distance between origin and destination {:?}",res.routes[0].legs[0].distance);
+            Some(res)
+        } 
+    }
+}
